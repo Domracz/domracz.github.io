@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>2-Party XOR Toy (make final = "ABCDEFGHIJ" when both true)</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;max-width:900px;margin:24px auto;padding:0 16px;color:#111}
+  h1{font-size:20px;margin-bottom:6px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  label{display:block;margin-top:8px;font-size:13px}
+  input[type=text]{width:100%;padding:8px;font-size:13px}
+  button{padding:8px 10px;margin-top:8px}
+  pre{background:#f7f7f7;padding:10px;border-radius:6px;overflow:auto}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace}
+  small{color:#555}
+</style>
+</head>
+  <h2>1) Choose target final (10 ASCII characters)</h2>
+  <input id="targetInput" type="text" maxlength="10" placeholder="e.g. ABCDEFGHIJ" />
+  <div style="margin-top:8px">
+    <button id="genBtn">Generate starting value & masks</button>
+    <small> (masks are random; you can re-generate anytime)</small>
+  </div>
+
+  <h2>Generated items</h2>
+  <div class="grid">
+    <div>
+      <label>Mask A (party A) — true / false (Base64URL)</label>
+      <pre id="maskA" class="mono"></pre>
+    </div>
+    <div>
+      <label>Mask B (party B) — true / false (Base64URL)</label>
+      <pre id="maskB" class="mono"></pre>
+    </div>
+
+    <div>
+      <label>Starting value S (Base64URL)</label>
+      <pre id="startVal" class="mono"></pre>
+    </div>
+    <div>
+      <label>Target final T (your input)</label>
+      <pre id="displayT" class="mono"></pre>
+    </div>
+  </div>
+
+  <h2>2) Simulate party A (first transform)</h2>
+  <label>Starting value to use (paste the Base64URL S you were given)</label>
+  <input id="a_input" type="text" placeholder="paste starting value S here" />
+  <label>Party A boolean</label>
+  <select id="a_bool"><option value="true">true</option><option value="false">false</option></select>
+  <div>
+    <button id="a_apply">Apply A's transform → produce message to send to B</button>
+  </div>
+  <label>Message to send to B (Base64URL)</label>
+  <pre id="msgToB" class="mono"></pre>
+
+  <h2>3) Simulate party B (second transform)</h2>
+  <label>Message received from A (paste the Base64URL here)</label>
+  <input id="b_input" type="text" placeholder="paste message from A here" />
+  <label>Party B boolean</label>
+  <select id="b_bool"><option value="true">true</option><option value="false">false</option></select>
+  <div>
+    <button id="b_apply">Apply B's transform → produce final</button>
+  </div>
+  <label>Final output (Base64URL and shown as ASCII if printable)</label>
+  <pre id="finalOut" class="mono"></pre>
+
+  <h3>Notes</h3>
+  <ul>
+    <li>This uses XOR on 10 bytes. The displayed strings are Base64URL encoded for safe copy/paste.</li>
+    <li>To get final == T, both parties must select their <code>true</code> masks. The page computes S so that this holds.</li>
+    <li>Everything runs in your browser only; no server involved.</li>
+  </ul>
+
+<script>
+/* Utilities: base64url encode/decode for Uint8Array */
+function toBase64Url(bytes){
+  // bytes -> binary string
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i=0; i<bytes.length; i+=chunk){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  let b64 = btoa(binary);
+  // convert to base64url (no padding)
+  return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function fromBase64Url(s){
+  // add padding
+  s = s.replace(/-/g,'+').replace(/_/g,'/');
+  while (s.length % 4) s += '=';
+  const binary = atob(s);
+  const bytes = new Uint8Array(binary.length);
+  for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  return bytes;
+}
+
+/* XOR two Uint8Array of same length */
+function xorBytes(a,b){
+  const out = new Uint8Array(a.length);
+  for (let i=0;i<a.length;i++) out[i] = a[i] ^ b[i];
+  return out;
+}
+
+/* Convert ASCII string (length 10) to 10 bytes; and back if printable */
+function asciiToBytes(s){
+  const enc = new TextEncoder();
+  return enc.encode(s); // must be 10 bytes ideally
+}
+function bytesToAsciiTry(bytes){
+  try{
+    const dec = new TextDecoder();
+    return dec.decode(bytes);
+  }catch(e){
+    return null;
+  }
+}
+
+/* Generate cryptographically random 10 bytes */
+function rand10(){
+  const a = new Uint8Array(10);
+  crypto.getRandomValues(a);
+  return a;
+}
+
+/* Elements */
+const maskApre = document.getElementById('maskA');
+const maskBpre = document.getElementById('maskB');
+const startPre = document.getElementById('startVal');
+const displayT = document.getElementById('displayT');
+const targetInput = document.getElementById('targetInput');
+const genBtn = document.getElementById('genBtn');
+
+let masks = {
+  A_true: null, A_false: null,
+  B_true: null, B_false: null
+};
+let S_bytes = null;
+let T_str = null;
+
+genBtn.addEventListener('click', ()=>{
+  const t = targetInput.value;
+  if (!t || t.length !== 10){
+    alert('Please enter exactly 10 ASCII characters for the target final T (length = 10). Example: ABCDEFGHIJ');
+    return;
+  }
+  T_str = t;
+  displayT.textContent = T_str;
+  // produce masks
+  masks.A_true  = rand10();
+  masks.A_false = rand10();
+  masks.B_true  = rand10();
+  masks.B_false = rand10();
+
+  // compute starting S: S = T ⊕ A_true ⊕ B_true
+  const Tbytes = asciiToBytes(T_str);
+  let tmp = xorBytes(Tbytes, masks.A_true);
+  S_bytes = xorBytes(tmp, masks.B_true);
+
+  // show masks and starting value in base64url
+  maskApre.textContent = 'A_true:  ' + toBase64Url(masks.A_true) + '\nA_false: ' + toBase64Url(masks.A_false);
+  maskBpre.textContent = 'B_true:  ' + toBase64Url(masks.B_true) + '\nB_false: ' + toBase64Url(masks.B_false);
+  startPre.textContent = toBase64Url(S_bytes);
+});
+
+/* Party A apply */
+document.getElementById('a_apply').addEventListener('click', ()=>{
+  const s_in = document.getElementById('a_input').value.trim();
+  if (!s_in) { alert('Paste a starting value S (Base64URL) into the field first.'); return; }
+  let sbytes;
+  try{ sbytes = fromBase64Url(s_in); } catch(e){ alert('Invalid base64url for S'); return; }
+  if (sbytes.length !== 10){ alert('Starting value must be 10 bytes (encoded).'); return; }
+  const choice = document.getElementById('a_bool').value;
+  const mask = (choice === 'true') ? masks.A_true : masks.A_false;
+  if (!mask){ alert('No masks generated yet — click "Generate" first.'); return; }
+  const out = xorBytes(sbytes, mask);
+  document.getElementById('msgToB').textContent = toBase64Url(out);
+});
+
+/* Party B apply */
+document.getElementById('b_apply').addEventListener('click', ()=>{
+  const bin = document.getElementById('b_input').value.trim();
+  if (!bin){ alert('Paste message from A (Base64URL) into the field.'); return; }
+  let bytes;
+  try{ bytes = fromBase64Url(bin); } catch(e){ alert('Invalid base64url'); return; }
+  if (bytes.length !== 10){ alert('Message must encode 10 bytes.'); return; }
+  const choice = document.getElementById('b_bool').value;
+  const mask = (choice === 'true') ? masks.B_true : masks.B_false;
+  if (!mask){ alert('No masks generated yet — click "Generate" first.'); return; }
+  const final = xorBytes(bytes, mask);
+  // show base64url and attempt ASCII display
+  const b64 = toBase64Url(final);
+  let ascii = bytesToAsciiTry(final);
+  if (ascii && ascii.length === 10 && /^[\x20-\x7E]*$/.test(ascii)){
+    document.getElementById('finalOut').textContent = b64 + '\nASCII: ' + ascii;
+  } else {
+    document.getElementById('finalOut').textContent = b64 + '\nASCII: (not printable ASCII)';
+  }
+  // additionally indicate whether final equals the target T (if a target was set)
+  if (T_str){
+    const Tbytes = asciiToBytes(T_str);
+    const equal = final.length === Tbytes.length && final.every((v,i)=>v === Tbytes[i]);
+    document.getElementById('finalOut').textContent += '\n\nMatches target T? ' + (equal ? 'YES' : 'NO');
+  }
+});
+</script>
+</body>
+</html>
