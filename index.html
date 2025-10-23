@@ -3,91 +3,97 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>2-Party XOR Toy (make final = "ABCDEFGHIJ" when both true)</title>
+<title>Two-Party Private-Token XOR Toy</title>
 <style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;max-width:900px;margin:24px auto;padding:0 16px;color:#111}
+  body{font-family:system-ui,Segoe UI,Roboto,Arial;max-width:900px;margin:20px auto;padding:0 16px;color:#111}
   h1{font-size:20px;margin-bottom:6px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   label{display:block;margin-top:8px;font-size:13px}
   input[type=text]{width:100%;padding:8px;font-size:13px}
   button{padding:8px 10px;margin-top:8px}
   pre{background:#f7f7f7;padding:10px;border-radius:6px;overflow:auto}
   .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace}
   small{color:#555}
+  .secret{background:#fff4e6;border:1px dashed #e6b27a;padding:8px;border-radius:6px}
 </style>
 </head>
-  <h2>1) Choose target final (10 ASCII characters)</h2>
-  <input id="targetInput" type="text" maxlength="10" placeholder="e.g. ABCDEFGHIJ" />
-  <div style="margin-top:8px">
-    <button id="genBtn">Generate starting value & masks</button>
-    <small> (masks are random; you can re-generate anytime)</small>
-  </div>
+<body>
+  <h1>Two-Party XOR (Private tokens per party)</h1>
+  <p>This generator produces a public <strong>Starting Value S</strong> and two <em>private</em> tokens (for A and B). Deliver the private tokens to each party separately — do not embed them in the public S.</p>
 
-  <h2>Generated items</h2>
-  <div class="grid">
-    <div>
-      <label>Mask A (party A) — true / false (Base64URL)</label>
-      <pre id="maskA" class="mono"></pre>
-    </div>
-    <div>
-      <label>Mask B (party B) — true / false (Base64URL)</label>
-      <pre id="maskB" class="mono"></pre>
-    </div>
-
-    <div>
-      <label>Starting value S (Base64URL)</label>
-      <pre id="startVal" class="mono"></pre>
-    </div>
-    <div>
-      <label>Target final T (your input)</label>
-      <pre id="displayT" class="mono"></pre>
-    </div>
-  </div>
-
-  <h2>2) Simulate party A (first transform)</h2>
-  <label>Starting value to use (paste the Base64URL S you were given)</label>
-  <input id="a_input" type="text" placeholder="paste starting value S here" />
-  <label>Party A boolean</label>
-  <select id="a_bool"><option value="true">true</option><option value="false">false</option></select>
+  <h2>1) Enter target final T (exactly 10 ASCII characters)</h2>
+  <input id="targetInput" type="text" maxlength="10" placeholder="ABCDEFGHIJ" />
   <div>
-    <button id="a_apply">Apply A's transform → produce message to send to B</button>
+    <button id="genBtn">Generate S & private tokens</button>
+    <small> (private tokens must be delivered privately to each party)</small>
   </div>
-  <label>Message to send to B (Base64URL)</label>
+
+  <h3>Output (copy these)</h3>
+  <div class="cols">
+    <div>
+      <label>Public Starting Value S (give this to everyone)</label>
+      <pre id="startVal" class="mono"></pre>
+      <small>Printable token ~14 chars (give publicly).</small>
+    </div>
+
+    <div>
+      <label>Private token for Party A (give only to A)</label>
+      <div class="secret"><pre id="tokenA" class="mono"></pre>
+      <button id="revealA">Reveal A token</button></div>
+      <small>Do not show this to Party B or others.</small>
+
+      <label style="margin-top:10px">Private token for Party B (give only to B)</label>
+      <div class="secret"><pre id="tokenB" class="mono"></pre>
+      <button id="revealB">Reveal B token</button></div>
+      <small>Do not show this to Party A or others.</small>
+    </div>
+  </div>
+
+  <hr/>
+
+  <h2>2) Party A: apply boolean and send message to B</h2>
+  <label>Paste public Starting Value S (you received this publicly)</label>
+  <input id="a_s_input" type="text" />
+  <label>Paste your Private Token (A)</label>
+  <input id="a_token_input" type="text" />
+  <label>A's boolean</label>
+  <select id="a_bool"><option value="true">true</option><option value="false">false</option></select>
+  <div><button id="a_apply">Apply → produce message to send to B</button></div>
+  <label>Message to send to B</label>
   <pre id="msgToB" class="mono"></pre>
 
-  <h2>3) Simulate party B (second transform)</h2>
-  <label>Message received from A (paste the Base64URL here)</label>
-  <input id="b_input" type="text" placeholder="paste message from A here" />
-  <label>Party B boolean</label>
+  <hr/>
+
+  <h2>3) Party B: apply boolean to message and get final</h2>
+  <label>Paste message received from A</label>
+  <input id="b_msg_input" type="text" />
+  <label>Paste your Private Token (B)</label>
+  <input id="b_token_input" type="text" />
+  <label>B's boolean</label>
   <select id="b_bool"><option value="true">true</option><option value="false">false</option></select>
-  <div>
-    <button id="b_apply">Apply B's transform → produce final</button>
-  </div>
-  <label>Final output (Base64URL and shown as ASCII if printable)</label>
+  <div><button id="b_apply">Apply → produce final</button></div>
+  <label>Final output (Base64URL and ASCII if printable)</label>
   <pre id="finalOut" class="mono"></pre>
 
-  <h3>Notes</h3>
+  <h3>Important notes</h3>
   <ul>
-    <li>This uses XOR on 10 bytes. The displayed strings are Base64URL encoded for safe copy/paste.</li>
-    <li>To get final == T, both parties must select their <code>true</code> masks. The page computes S so that this holds.</li>
-    <li>Everything runs in your browser only; no server involved.</li>
+    <li><strong>Private tokens must be delivered privately</strong> to each respective party (A gets only A's token; B gets only B's token). The public S can be given to anyone.</li>
+    <li>Internally this uses XOR on 10 bytes. The generator computed S = T ⊕ A_true ⊕ B_true so that when both choose <code>true</code> the final equals T.</li>
+    <li>This is a toy: do not use for real secrets without expert review. If an attacker obtains a party's private token they can alter outcomes.</li>
   </ul>
 
 <script>
-/* Utilities: base64url encode/decode for Uint8Array */
+/* base64url helpers */
 function toBase64Url(bytes){
-  // bytes -> binary string
   let binary = "";
   const chunk = 0x8000;
   for (let i=0; i<bytes.length; i+=chunk){
     binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
   }
   let b64 = btoa(binary);
-  // convert to base64url (no padding)
   return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
 function fromBase64Url(s){
-  // add padding
   s = s.replace(/-/g,'+').replace(/_/g,'/');
   while (s.length % 4) s += '=';
   const binary = atob(s);
@@ -95,114 +101,117 @@ function fromBase64Url(s){
   for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
   return bytes;
 }
-
-/* XOR two Uint8Array of same length */
 function xorBytes(a,b){
   const out = new Uint8Array(a.length);
   for (let i=0;i<a.length;i++) out[i] = a[i] ^ b[i];
   return out;
 }
-
-/* Convert ASCII string (length 10) to 10 bytes; and back if printable */
-function asciiToBytes(s){
-  const enc = new TextEncoder();
-  return enc.encode(s); // must be 10 bytes ideally
-}
+function asciiToBytes(s){ return new TextEncoder().encode(s); }
 function bytesToAsciiTry(bytes){
-  try{
-    const dec = new TextDecoder();
-    return dec.decode(bytes);
-  }catch(e){
-    return null;
-  }
+  try{ return new TextDecoder().decode(bytes); }catch(e){ return null; }
 }
-
-/* Generate cryptographically random 10 bytes */
-function rand10(){
-  const a = new Uint8Array(10);
-  crypto.getRandomValues(a);
-  return a;
-}
+function randN(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return a; }
 
 /* Elements */
-const maskApre = document.getElementById('maskA');
-const maskBpre = document.getElementById('maskB');
 const startPre = document.getElementById('startVal');
-const displayT = document.getElementById('displayT');
-const targetInput = document.getElementById('targetInput');
-const genBtn = document.getElementById('genBtn');
+const tokenApre = document.getElementById('tokenA');
+const tokenBpre = document.getElementById('tokenB');
+const revealA = document.getElementById('revealA');
+const revealB = document.getElementById('revealB');
 
-let masks = {
-  A_true: null, A_false: null,
-  B_true: null, B_false: null
-};
+let A_token_obj = null;
+let B_token_obj = null;
 let S_bytes = null;
 let T_str = null;
 
-genBtn.addEventListener('click', ()=>{
-  const t = targetInput.value;
-  if (!t || t.length !== 10){
-    alert('Please enter exactly 10 ASCII characters for the target final T (length = 10). Example: ABCDEFGHIJ');
-    return;
-  }
+/* Generate: create four masks (A_true, A_false, B_true, B_false).
+   Compute S = T ⊕ A_true ⊕ B_true. Keep tokens private. */
+document.getElementById('genBtn').addEventListener('click', ()=>{
+  const t = document.getElementById('targetInput').value;
+  if (!t || t.length !== 10){ alert('Enter exactly 10 ASCII characters for T.'); return; }
   T_str = t;
-  displayT.textContent = T_str;
-  // produce masks
-  masks.A_true  = rand10();
-  masks.A_false = rand10();
-  masks.B_true  = rand10();
-  masks.B_false = rand10();
+  // generate masks
+  const A_true = randN(10), A_false = randN(10);
+  const B_true = randN(10), B_false = randN(10);
 
-  // compute starting S: S = T ⊕ A_true ⊕ B_true
+  // compute S = T ⊕ A_true ⊕ B_true
   const Tbytes = asciiToBytes(T_str);
-  let tmp = xorBytes(Tbytes, masks.A_true);
-  S_bytes = xorBytes(tmp, masks.B_true);
+  let tmp = xorBytes(Tbytes, A_true);
+  S_bytes = xorBytes(tmp, B_true);
 
-  // show masks and starting value in base64url
-  maskApre.textContent = 'A_true:  ' + toBase64Url(masks.A_true) + '\nA_false: ' + toBase64Url(masks.A_false);
-  maskBpre.textContent = 'B_true:  ' + toBase64Url(masks.B_true) + '\nB_false: ' + toBase64Url(masks.B_false);
+  // Public S (Base64URL)
   startPre.textContent = toBase64Url(S_bytes);
+
+  // Private tokens: we will encode the pair of masks for each party as a small JSON object,
+  // then base64url-encode it so it can be copied/pasted easily.
+  A_token_obj = { role:'A', true: toBase64Url(A_true), false: toBase64Url(A_false) };
+  B_token_obj = { role:'B', true: toBase64Url(B_true), false: toBase64Url(B_false) };
+
+  // For safety, do NOT auto-show tokens. Show placeholders; reveal on explicit button click.
+  tokenApre.textContent = 'TOKEN NOT REVEALED — click "Reveal A token" (copy & deliver privately)';
+  tokenBpre.textContent = 'TOKEN NOT REVEALED — click "Reveal B token" (copy & deliver privately)';
 });
 
-/* Party A apply */
+/* Reveal functions — reveal only on explicit click so generator consciously copies tokens out-of-band */
+revealA.addEventListener('click', ()=>{
+  if (!A_token_obj){ alert('Generate first.'); return; }
+  tokenApre.textContent = JSON.stringify(A_token_obj);
+});
+revealB.addEventListener('click', ()=>{
+  if (!B_token_obj){ alert('Generate first.'); return; }
+  tokenBpre.textContent = JSON.stringify(B_token_obj);
+});
+
+/* Party A: apply */
 document.getElementById('a_apply').addEventListener('click', ()=>{
-  const s_in = document.getElementById('a_input').value.trim();
-  if (!s_in) { alert('Paste a starting value S (Base64URL) into the field first.'); return; }
+  const s_in = document.getElementById('a_s_input').value.trim();
+  const token_in = document.getElementById('a_token_input').value.trim();
+  if (!s_in || !token_in){ alert('Paste public S and your private token A.'); return; }
   let sbytes;
-  try{ sbytes = fromBase64Url(s_in); } catch(e){ alert('Invalid base64url for S'); return; }
-  if (sbytes.length !== 10){ alert('Starting value must be 10 bytes (encoded).'); return; }
-  const choice = document.getElementById('a_bool').value;
-  const mask = (choice === 'true') ? masks.A_true : masks.A_false;
-  if (!mask){ alert('No masks generated yet — click "Generate" first.'); return; }
+  try{ sbytes = fromBase64Url(s_in); } catch(e){ alert('Invalid S encoding'); return; }
+  if (sbytes.length !== 10){ alert('S must encode 10 bytes'); return; }
+
+  // parse token (we expect generator to have given JSON like {"role":"A","true":"...","false":"..."} )
+  let tok;
+  try{ tok = JSON.parse(token_in); } catch(e){ alert('Invalid token format — expected JSON (copy token exactly).'); return; }
+  if (!tok.true || !tok.false){ alert('Token missing true/false masks.'); return; }
+  let mask;
+  try{ mask = fromBase64Url(tok[ document.getElementById('a_bool').value ]); } catch(e){ alert('Invalid mask data'); return; }
+  if (mask.length !== 10){ alert('Mask length wrong.'); return; }
+
   const out = xorBytes(sbytes, mask);
   document.getElementById('msgToB').textContent = toBase64Url(out);
 });
 
-/* Party B apply */
+/* Party B: apply */
 document.getElementById('b_apply').addEventListener('click', ()=>{
-  const bin = document.getElementById('b_input').value.trim();
-  if (!bin){ alert('Paste message from A (Base64URL) into the field.'); return; }
-  let bytes;
-  try{ bytes = fromBase64Url(bin); } catch(e){ alert('Invalid base64url'); return; }
-  if (bytes.length !== 10){ alert('Message must encode 10 bytes.'); return; }
-  const choice = document.getElementById('b_bool').value;
-  const mask = (choice === 'true') ? masks.B_true : masks.B_false;
-  if (!mask){ alert('No masks generated yet — click "Generate" first.'); return; }
-  const final = xorBytes(bytes, mask);
-  // show base64url and attempt ASCII display
+  const msg_in = document.getElementById('b_msg_input').value.trim();
+  const token_in = document.getElementById('b_token_input').value.trim();
+  if (!msg_in || !token_in){ alert('Paste message from A and your private token B.'); return; }
+  let mbytes;
+  try{ mbytes = fromBase64Url(msg_in); } catch(e){ alert('Invalid message encoding'); return; }
+  if (mbytes.length !== 10){ alert('Message must encode 10 bytes'); return; }
+
+  let tok;
+  try{ tok = JSON.parse(token_in); } catch(e){ alert('Invalid token format — expected JSON.'); return; }
+  if (!tok.true || !tok.false){ alert('Token missing true/false masks.'); return; }
+  let mask;
+  try{ mask = fromBase64Url(tok[ document.getElementById('b_bool').value ]); } catch(e){ alert('Invalid mask data'); return; }
+  if (mask.length !== 10){ alert('Mask length wrong.'); return; }
+
+  const final = xorBytes(mbytes, mask);
   const b64 = toBase64Url(final);
   let ascii = bytesToAsciiTry(final);
-  if (ascii && ascii.length === 10 && /^[\x20-\x7E]*$/.test(ascii)){
-    document.getElementById('finalOut').textContent = b64 + '\nASCII: ' + ascii;
-  } else {
-    document.getElementById('finalOut').textContent = b64 + '\nASCII: (not printable ASCII)';
-  }
-  // additionally indicate whether final equals the target T (if a target was set)
+  let outText = b64 + '\\n';
+  if (ascii && ascii.length === 10 && /^[\\x20-\\x7E]*$/.test(ascii)) outText += 'ASCII: ' + ascii;
+  else outText += 'ASCII: (not printable)';
+  // If generator used this page and T is known locally, optionally check match:
   if (T_str){
-    const Tbytes = asciiToBytes(T_str);
+    const Tbytes = asciiToBytes(T_str || '');
     const equal = final.length === Tbytes.length && final.every((v,i)=>v === Tbytes[i]);
-    document.getElementById('finalOut').textContent += '\n\nMatches target T? ' + (equal ? 'YES' : 'NO');
+    outText += '\\n\\nMatches target T? ' + (equal ? 'YES' : 'NO');
   }
+  document.getElementById('finalOut').textContent = outText;
 });
 </script>
 </body>
