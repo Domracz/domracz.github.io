@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QR Code</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<h3>QR Code</h3>
+<div id="qr"></div>
+
+<script>
+function getQueryParam(name) {
+    return new URLSearchParams(window.location.search).get(name);
+}
+
+const base64 = getQueryParam("code");
+if (!base64) {
+    document.body.insertAdjacentHTML("beforeend", "<p>Missing ?code= parameter</p>");
+} else {
+    try {
+        const decoded = atob(base64);
+        QRCode.toCanvas(decoded, { width: 256 }, (err, canvas) => {
+            if (err) throw err;
+            document.getElementById("qr").appendChild(canvas);
+        });
+    } catch {
+        document.body.insertAdjacentHTML("beforeend", "<p>Invalid Base64</p>");
+    }
+}
+</script>
+
+</body>
+</html>
