@@ -29,12 +29,12 @@ if (!base64) {
     document.body.insertAdjacentHTML("beforeend", "<p>Missing ?code= parameter</p>");
 } else {
     try {
-        const decoded = atob(base64);
+        const decoded = atob(decodeURIComponent(base64));
         QRCode.toCanvas(decoded, { width: 256 }, (err, canvas) => {
             if (err) throw err;
             document.getElementById("qr").appendChild(canvas);
         });
-    } catch {
+    } catch (e) {
         document.body.insertAdjacentHTML("beforeend", "<p>Invalid Base64</p>");
     }
 }
