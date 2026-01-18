@@ -1,45 +1,54 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>QR Code</title>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
-    <style>
-        body {
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-top: 40px;
-        }
-    </style>
+  <meta charset="utf-8">
+  <title>TOTP QR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+    }
+  </style>
 </head>
 <body>
+  <div id="qr"></div>
 
-<h3>QR Code</h3>
-<div id="qr"></div>
-
-<script>
-function getQueryParam(name) {
-    return new URLSearchParams(window.location.search).get(name);
-}
-
-const base64 = getQueryParam("code");
-if (!base64) {
-    document.body.insertAdjacentHTML("beforeend", "<p>Missing ?code= parameter</p>");
-} else {
-    try {
-        alert(decodeURIComponent(base64));
-        const decoded = atob(decodeURIComponent(base64));
-        QRCode.toCanvas(decoded, { width: 256 }, (err, canvas) => {
-            if (err) throw err;
-            document.getElementById("qr").appendChild(canvas);
-        });
-    } catch (e) {
-        document.body.insertAdjacentHTML("beforeend", "<p>Invalid Base64</p>");
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script>
+    function getQueryParam(name) {
+      return new URLSearchParams(window.location.search).get(name);
     }
-}
-</script>
 
+    const encoded = getQueryParam("data");
+    if (!encoded) {
+      document.body.textContent = "Missing data parameter";
+      throw new Error("Missing data parameter");
+    }
+
+    let uri;
+    try {
+      uri = decodeURIComponent(encoded);
+    } catch {
+      document.body.textContent = "Invalid URL encoding";
+      throw new Error("Invalid encoding");
+    }
+
+    if (!uri.startsWith("otpauth://totp/")) {
+      document.body.textContent = "Invalid otpauth URI";
+      throw new Error("Invalid otpauth URI");
+    }
+
+    new QRCode(document.getElementById("qr"), {
+      text: uri,
+      width: 256,
+      height: 256,
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  </script>
 </body>
 </html>
